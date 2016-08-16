@@ -1,0 +1,309 @@
+<!doctype html> 
+<html lang="en"> 
+    <head> 
+        <meta charset="UTF-8" />
+        <title>Phaser - Making your first game, part 1</title>
+        <script type="text/javascript" src="js/phaser.min.js"></script>
+        <style type="text/css">
+            body {
+                margin: 0;
+            }
+        </style>
+    </head>
+    <body>
+
+        <script type="text/javascript">
+            // Set up variables and canvas
+            var game = new Phaser.Game(900, 900, Phaser.AUTO, '', {preload: preload, create: create, update: update});
+            var gameOn = false;
+            var kills = 0;
+            var shots = 3;
+            var monkeyDying = false;
+            var monkeyNumber = 0;
+            var monkeyLaunch = false;
+            var lives = 10;
+            var gameOver = false;
+            var monkeySpeed = 1;
+
+            function preload() {
+                // Source: http://whatthedoost.files.wordpress.com/2014/05/aladdin-sultans-palace-taj-mahal.jpg
+                game.load.image('background', 'assets/background.jpg');
+                // Source: http://www.chubb.com/businesses/cci/chubb16409.pdf
+                game.load.image('grass', 'assets/grass.png');
+                game.load.image('collisionHUD', 'assets/HUD.png');
+                game.load.image('HUD', 'assets/HUD.png');
+                // Source: http://img2.wikia.nocookie.net/__cb20140302193151/disney/images/6/60/Clipabuangry.gif
+                game.load.spritesheet('monkey', 'assets/monkey.png', 320, 309);
+                game.load.image('menu', 'assets/menu.png');
+                // Source: http://www.turbosquid.com/3d-models/3d-bullet/745809
+                game.load.image('bullet', 'assets/bullet.png');
+                // Source: http://kidzcoloringsheet.com/monkey-face-drawing-clipart-best-how-to-draw-a-cute-monkey-face.html
+                game.load.image('monkeyRed', 'assets/monkeyFaceRed.png');
+                game.load.image('monkeyWhite', 'assets/monkeyFace.png');
+                game.load.image('gameover', 'assets/gameover.jpg');
+                // Source: http://tf2dingalings.com/sound/details/878
+                game.load.audio('pew', 'assets/pew.mp3');
+                // Source: http://www.youtube.com/watch?v=nlYlNF30bVg
+                game.load.audio('scream', 'assets/scream.wav');
+                // Source: http://www.youtube.com/watch?v=Furs535ly94
+                game.load.audio('gameOverSound', 'assets/gameOverSound.mp3');
+                // Source 1: http://img2.wikia.nocookie.net/__cb20130705113729/scratchpad/images/a/a6/Rajah-Aladdin.png
+                // Source 2: http://www.aladdincentral.org/clipart/rajah-Robyn.gif
+                game.load.spritesheet('tiger', 'assets/tiger.png', 570, 180);
+            }
+
+            function create() {
+                // Creates every sprite
+                background = game.add.sprite(0, 0, 'background');
+                monkey = game.add.sprite(game.world.width / 2, game.world.height - 100, 'monkey');
+                tiger = game.add.sprite(330, 720, 'tiger');
+                grass = game.add.sprite(0, 541, 'grass');
+                HUD = game.add.sprite(0, 720, 'HUD');
+                HUD2 = game.add.sprite(0, 720, 'collisionHUD');
+                bullet1 = game.add.sprite(72, 790, 'bullet');
+                bullet2 = game.add.sprite(122, 790, 'bullet');
+                bullet3 = game.add.sprite(172, 790, 'bullet');
+                monkeyRed = game.add.group();
+                monkeyWhite = game.add.group();
+                monkeyWhite.scale.setTo(0.075);
+                monkeyRed.scale.setTo(0.075);
+                menu = game.add.sprite(0, 0, 'menu');
+                gameOverScreen = game.add.sprite(0, 0, 'gameover');
+                // Creates sounds
+                pew = game.add.audio('pew');
+                scream = game.add.audio('scream');
+                gameOverSound = game.add.audio('gameOverSound');
+                
+                // Creates each monkey face in the Lives box
+                for(var i = 0; i < 10; i++){
+                    monkeyFaceWhite = monkeyWhite.create((252 + i * 40)*(1/0.075), 810 * (1/0.075), 'monkeyWhite');
+                    monkeyFaceRed = monkeyRed.create((252 + i * 40)*(1/0.075), 810 * (1/0.075), 'monkeyRed');
+                }
+                
+                // Scales down the bullets
+                bullet1.scale.setTo(0.2);
+                bullet2.scale.setTo(0.2);
+                bullet3.scale.setTo(0.2);
+                
+                // Enables physics on things that need physics
+                game.physics.startSystem(Phaser.Physics.Arcade);
+                game.physics.arcade.enable(monkey);
+                game.physics.arcade.enable(HUD);
+                game.physics.arcade.enable(tiger);
+                
+                // Enables the HUD so that the monkey can bounce off of it
+                HUD.enableBody = true;
+                HUD.body.immovable = true;
+
+                // Sets up physics for the tiger
+                tiger.enableBody = true;
+                tiger.body.gravity.set(500);
+                tiger.body.collideWorldBounds = true;
+                
+                // Scale down monkey, set up its physics
+                monkey.scale.setTo(0.3, 0.3);
+                monkey.enableBody = true;
+                monkey.body.bounce.set(1);
+                monkey.body.gravity.set(0);
+                monkey.body.collideWorldBounds = true;
+                
+                // Left/right flying animations for the monkey
+                monkey.animations.add('left', [0, 1], 10, true);
+                monkey.animations.add('right', [2, 3], 10, true);
+                
+                // Kill the monkey when it's clicked
+                monkey.inputEnabled = true;
+                monkey.events.onInputDown.add(kill, this);
+                // You miss if you click the background
+                background.inputEnabled = true;
+                background.events.onInputDown.add(miss, this);
+                // Start the game when the menu is clicked
+                menu.inputEnabled = true;
+                menu.events.onInputDown.add(start, this);
+                // Goes back to main menu when game over screen is clicked
+                gameOverScreen.inputEnabled = true;
+                gameOverScreen.events.onInputDown.add(closeGameOver, this);
+                gameOverScreen.exists = false;
+                
+                // source: http://examples.phaser.io/_site/view_full.html?d=basics&f=06+-+render+text.js&t=06%20-%20render%20text&jsbin=http://jsbin.com/zagob/11/edit?js,output
+                // Creates the text for the in-game score and the game over score
+                var scoreText = "Score: " + kills;
+                var scoreStyle1 = { font: "65px Arial", fill: "#ffffff", align: "center" };
+                var scoreStyle2 = { font: "70px Arial", fill: "#ff0000", align: "center" };
+                scoreGameOver = game.add.text(game.world.centerX-150, 0, " ", scoreStyle1);
+                scoreGameOn = game.add.text(game.world.width - 125, game.world.height - 70, " ", scoreStyle2);
+                scoreGameOn.anchor.setTo(0.5, 0.5);
+
+            }
+
+            function update() {
+                // Executes while the game is in progress
+                if (gameOn) {
+                    // Updates score
+                    scoreGameOn.setText(kills);
+                    // Sets up collisions between monkey and HUD
+                    game.physics.arcade.collide(monkey, HUD);
+                    // Plays right flapping animation when monkey moves right
+                    if (monkey.body.velocity.x > 0) {
+                        monkey.animations.play('right');
+                    }
+                    // Plays left flapping animation when monkey moves left
+                    else if (monkey.body.velocity.x < 0) {
+                        monkey.animations.play('left');
+                    }
+                    // Start the monkey launching process if the monkey goes behind the HUD
+                    // Happens when the monkey is shot or escapes
+                    if (monkey.y > 740 && monkey.body.velocity.y > 0) {
+                        newMonkey();
+                        // If you're out of lives, the game is ended
+                        if (lives < 1){
+                            gameOn = false;
+                            gameOver = true;
+                            gameOverSound.play();
+                        }
+                    }
+                    // Displays the number of shots left
+                    switch(shots){
+                        case 3: bullet3.exists = true;
+                                bullet2.exists = true;
+                                bullet1.exists = true;
+                                break;
+                        case 2: bullet3.exists = false;
+                                break;
+                        case 1: bullet2.exists = false;
+                                break;
+                        // Monkey escapes if you have zero bullets
+                        case 0: bullet1.exists = false;
+                                if(!monkeyDying){
+                                    lose();
+                                }
+                    }
+                }
+                // Executes when the game is not in progress
+                else {
+                    // Displays the main menu
+                    menu.exists = true;
+                    scoreGameOn.setText(" ");
+                    // Displays the game over screen if you have lost
+                    if(gameOver){
+                        gameOverScreen.exists = true;
+                        scoreGameOver.setText("Score: " + kills);
+                    }
+                    // Hides game over screen when it's clicked
+                    else{
+                        gameOverScreen.exists = false;
+                        scoreGameOver.setText(" ");
+                    }
+                }
+            }
+            
+            // Returns a random number in the range (used to create a random velocity for the monkey)
+            function randomNumber(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+            
+            // Returns 1 or -1 (used to make monkey launch in a random direction)
+            function randomSign() {
+                if (Math.random() < 0.5) {
+                    return -1;
+                }
+                else {
+                    return 1;
+                }
+            }
+            
+            // Executes whenever the monkey is clicked
+            function kill() {
+                // Only executes once each time monkey dies
+                if (!monkeyDying){
+                    // Plays scream sound, increases monkey speed, increases score, makes monkey stay still
+                    scream.play();
+                    monkeySpeed += 0.1;
+                    monkeyDying = true;
+                    kills += 1;
+                    monkey.body.velocity.x = 0;
+                    monkey.body.velocity.y = 0;
+                    monkey.animations.stop();
+                    game.time.events.add(Phaser.Timer.SECOND, monkeyFall, this);
+                }
+                // Plays pew sound if you have bullets left
+                if (shots > 0){
+                    pew.play();
+                }
+                shots -= 1;
+                
+            }
+            
+            // Makes monkey fall behind the HUD
+            function monkeyFall() {
+                HUD.exists = false;
+                monkey.frame = 4;
+                monkey.body.velocity.y = 500;
+            }
+            
+            // Makes the tiger pop up, wait for two seconds
+            function newMonkey() {
+                tiger.body.velocity.y = -500;
+                monkey.body.velocity.y = 0;
+                monkey.body.velocity.x = randomSign() * randomNumber(500, 1000);
+                game.time.events.add(Phaser.Timer.SECOND * 2, launchMonkey, this);
+            }
+            
+            // Monkey is launched back out of HUD at a random velocity, shots are reset
+            function launchMonkey() {
+                monkey.body.velocity.x = randomSign() * randomNumber(450, 550) * monkeySpeed;
+                monkey.body.velocity.y = 0 - randomNumber(450, 550) * monkeySpeed;
+                shots = 3;
+                HUD.exists = true;
+                monkeyDying = false;
+                monkeyLaunch = false;
+                tiger.frame = 0;
+            }
+            
+            // Detracts one shot if the background is clicked
+            function miss() {
+                // Plays pew sound if you have bullets left
+                if (shots > 0){
+                    pew.play();
+                }
+                shots -= 1;
+            }
+            
+            // Executes when the main menu is clicked, starts the game and resets variables
+            function start() {
+                menu.exists = false;
+                gameOn = true;
+                kills = 0;
+                shots = 3;
+                monkeyDying = false;
+                monkeyNumber = 0;
+                monkeyLaunch = false;
+                lives = 10;
+                monkeySpeed = 1;
+                monkeyWhite.setAllChildren('exists',true);
+                // Sets monkey to move at random velocity
+                monkey.body.velocity.x = randomSign() * randomNumber(450, 550);
+                monkey.body.velocity.y = 0 - randomNumber(450, 550);
+            }
+            
+            // Executes when the game over screen is clicked, goes back to menu
+            function closeGameOver() {
+                gameOver = false;
+            }
+            
+            // Executes when you run out of shots, detracts one life
+            function lose() {
+                monkeyDying = true;
+                shots = -1;
+                tiger.frame = 1;
+                lives -= 1;
+                HUD.exists = false;
+                monkeyWhite.getFirstExists(true).exists = false;
+            }
+            
+        </script>
+
+    </body>
+</html>
+
+
